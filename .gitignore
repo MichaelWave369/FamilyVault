@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+backend/.venv/
+backend/familyvault.db
+node_modules/
+dist/
+.env
+storage/

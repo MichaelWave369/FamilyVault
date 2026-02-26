@@ -1,0 +1,6 @@
+name: Feature request
+description: Suggest a feature
+body:
+  - type: textarea
+    id: idea
+    attributes: {label: Proposal}
