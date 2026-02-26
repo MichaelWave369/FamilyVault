@@ -1,0 +1,1 @@
+:root{font-family:Inter,sans-serif;color:#e5f5ff;background:#090d14}body{margin:0}.app{display:flex;min-height:100vh}aside{width:220px;background:#0f1524;padding:1rem;display:flex;flex-direction:column;gap:.6rem}a{color:#91e6ff;text-decoration:none}main{flex:1;padding:1rem}header{display:flex;gap:.5rem;justify-content:flex-end}

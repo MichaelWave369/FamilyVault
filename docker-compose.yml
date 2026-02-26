@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: familyvault
+      POSTGRES_PASSWORD: familyvault
+      POSTGRES_DB: familyvault
+    ports: ['5432:5432']
+    volumes: [pg_data:/var/lib/postgresql/data]
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_URL: postgresql+psycopg2://familyvault:familyvault@postgres:5432/familyvault
+      JWT_SECRET: change-me
+      FAMILYVAULT_MASTER_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+      CORS_ORIGINS: http://localhost:5173
+    depends_on: [postgres]
+    ports: ['8000:8000']
+volumes:
+  pg_data:

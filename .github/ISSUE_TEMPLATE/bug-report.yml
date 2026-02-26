@@ -1,0 +1,6 @@
+name: Bug report
+description: File a bug report
+body:
+  - type: textarea
+    id: steps
+    attributes: {label: Steps to reproduce}
