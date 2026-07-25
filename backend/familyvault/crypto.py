@@ -1,4 +1,3 @@
-import base64
 import json
 
 from cryptography.fernet import Fernet
@@ -6,22 +5,27 @@ from cryptography.fernet import Fernet
 from familyvault.config import settings
 
 
-def _fernet() -> Fernet:
-    key = settings.familyvault_master_key.encode()
-    raw = base64.urlsafe_b64encode(base64.b64decode(key)) if len(key) != 44 else key
-    return Fernet(raw)
+_fernet = Fernet(settings.familyvault_master_key.encode())
+
+
+def encrypt_bytes(plaintext: bytes) -> bytes:
+    return _fernet.encrypt(plaintext)
+
+
+def decrypt_bytes(ciphertext: bytes) -> bytes:
+    return _fernet.decrypt(ciphertext)
 
 
 def encrypt_text(plaintext: str) -> str:
-    return _fernet().encrypt(plaintext.encode()).decode()
+    return encrypt_bytes(plaintext.encode()).decode()
 
 
 def decrypt_text(ciphertext: str) -> str:
-    return _fernet().decrypt(ciphertext.encode()).decode()
+    return decrypt_bytes(ciphertext.encode()).decode()
 
 
 def encrypt_payload(payload: dict) -> str:
-    return encrypt_text(json.dumps(payload))
+    return encrypt_text(json.dumps(payload, separators=(',', ':')))
 
 
 def decrypt_payload(payload: str) -> dict:
