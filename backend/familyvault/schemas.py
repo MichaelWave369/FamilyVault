@@ -1,112 +1,141 @@
 from datetime import date, datetime
-from pydantic import BaseModel, EmailStr
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, EmailStr, Field, StringConstraints, field_validator, model_validator
+
+ShortName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+LongText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=10_000)]
+Password = Annotated[str, StringConstraints(min_length=12, max_length=128)]
+CurrencyCode = Annotated[str, StringConstraints(pattern=r'^[A-Z]{3}$')]
+FamilyRole = Literal['guest', 'child', 'teen', 'adult']
+VaultPermission = Literal['read', 'write']
 
 
 class RegisterIn(BaseModel):
     email: EmailStr
-    password: str
-    name: str
+    password: Password
+    name: ShortName
 
 
 class LoginIn(BaseModel):
     email: EmailStr
-    password: str
+    password: Annotated[str, StringConstraints(min_length=1, max_length=128)]
 
 
 class TokenOut(BaseModel):
     access_token: str
-    refresh_token: str
     token_type: str = 'bearer'
 
 
 class FamilyIn(BaseModel):
-    name: str
+    name: ShortName
 
 
 class InviteIn(BaseModel):
     email: EmailStr
-    role: str
+    role: FamilyRole
 
 
 class InviteAcceptIn(BaseModel):
-    token: str
+    token: Annotated[str, StringConstraints(min_length=20, max_length=255)]
 
 
 class CalendarIn(BaseModel):
-    name: str
-    color: str = '#6ee7ff'
+    name: ShortName
+    color: str = Field(default='#6ee7ff', pattern=r'^#[0-9A-Fa-f]{6}$')
 
 
 class EventIn(BaseModel):
-    title: str
-    description: str | None = None
-    location: str | None = None
+    title: ShortName
+    description: LongText | None = None
+    location: Annotated[str, StringConstraints(strip_whitespace=True, max_length=255)] | None = None
     start_at: datetime
     end_at: datetime
     all_day: bool = False
-    recurrence_rule: str | None = None
+    recurrence_rule: Annotated[str, StringConstraints(strip_whitespace=True, max_length=255)] | None = None
+
+    @model_validator(mode='after')
+    def validate_times(self):
+        if self.end_at <= self.start_at:
+            raise ValueError('end_at must be after start_at')
+        return self
 
 
 class ChoreIn(BaseModel):
-    title: str
-    description: str | None = None
-    points: int = 0
-    schedule_rule: str | None = None
+    title: ShortName
+    description: LongText | None = None
+    points: int = Field(default=0, ge=0, le=100_000)
+    schedule_rule: Annotated[str, StringConstraints(strip_whitespace=True, max_length=255)] | None = None
 
 
 class AssignmentIn(BaseModel):
-    assignee_member_id: int
+    assignee_member_id: int = Field(gt=0)
     due_at: datetime | None = None
 
 
 class ShoppingListIn(BaseModel):
-    name: str
+    name: ShortName
 
 
 class ShoppingItemIn(BaseModel):
-    text: str
-    qty: str | None = None
-    unit: str | None = None
-    category: str | None = None
+    text: ShortName
+    qty: Annotated[str, StringConstraints(strip_whitespace=True, max_length=50)] | None = None
+    unit: Annotated[str, StringConstraints(strip_whitespace=True, max_length=20)] | None = None
+    category: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] | None = None
 
 
 class ShoppingItemPatch(BaseModel):
-    text: str | None = None
-    qty: str | None = None
-    unit: str | None = None
+    text: ShortName | None = None
+    qty: Annotated[str, StringConstraints(strip_whitespace=True, max_length=50)] | None = None
+    unit: Annotated[str, StringConstraints(strip_whitespace=True, max_length=20)] | None = None
     checked: bool | None = None
-    category: str | None = None
+    category: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] | None = None
 
 
 class ExpenseAccountIn(BaseModel):
-    name: str
-    currency: str = 'USD'
+    name: ShortName
+    currency: CurrencyCode = 'USD'
+
+    @field_validator('currency')
+    @classmethod
+    def uppercase_currency(cls, value: str) -> str:
+        return value.upper()
 
 
 class ExpenseIn(BaseModel):
-    amount_cents: int
-    currency: str = 'USD'
-    category: str = 'general'
-    merchant: str | None = None
-    notes: str | None = None
+    amount_cents: int = Field(gt=0, le=1_000_000_000_00)
+    currency: CurrencyCode = 'USD'
+    category: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)] = 'general'
+    merchant: Annotated[str, StringConstraints(strip_whitespace=True, max_length=255)] | None = None
+    notes: LongText | None = None
     spent_at: datetime
+
+    @field_validator('currency')
+    @classmethod
+    def uppercase_currency(cls, value: str) -> str:
+        return value.upper()
 
 
 class ProfileIn(BaseModel):
-    member_id: int
+    member_id: int = Field(gt=0)
     dob: date | None = None
-    blood_type: str | None = None
-    notes: str | None = None
+    blood_type: Annotated[str, StringConstraints(strip_whitespace=True, max_length=10)] | None = None
+    notes: LongText | None = None
 
 
 class FolderIn(BaseModel):
-    name: str
+    name: ShortName
 
 
 class VaultItemIn(BaseModel):
-    title: str
-    username: str | None = None
-    url: str | None = None
-    secret: str
-    totp_seed: str | None = None
-    notes: str | None = None
+    title: ShortName
+    username: Annotated[str, StringConstraints(strip_whitespace=True, max_length=255)] | None = None
+    url: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2048)] | None = None
+    secret: Annotated[str, StringConstraints(min_length=1, max_length=10_000)]
+    totp_seed: Annotated[str, StringConstraints(strip_whitespace=True, max_length=512)] | None = None
+    notes: LongText | None = None
+
+
+class VaultAccessIn(BaseModel):
+    member_id: int = Field(gt=0)
+    permission: VaultPermission = 'read'
