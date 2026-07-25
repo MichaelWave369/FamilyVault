@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from familyvault.db import Base
@@ -15,6 +15,20 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class RefreshSession(Base):
+    __tablename__ = 'refresh_sessions'
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    replaced_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class Family(Base):
     __tablename__ = 'families'
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -24,9 +38,10 @@ class Family(Base):
 
 class FamilyMember(Base):
     __tablename__ = 'family_members'
+    __table_args__ = (UniqueConstraint('family_id', 'user_id', name='uq_family_member_user'),)
     id: Mapped[int] = mapped_column(primary_key=True)
-    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'))
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
     role: Mapped[str] = mapped_column(String(20))
     display_name: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -35,8 +50,8 @@ class FamilyMember(Base):
 class Invite(Base):
     __tablename__ = 'invites'
     id: Mapped[int] = mapped_column(primary_key=True)
-    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'))
-    email: Mapped[str] = mapped_column(String(255))
+    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'), index=True)
+    email: Mapped[str] = mapped_column(String(255), index=True)
     role: Mapped[str] = mapped_column(String(20))
     token: Mapped[str] = mapped_column(String(255), unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime)
@@ -46,7 +61,7 @@ class Invite(Base):
 class Calendar(Base):
     __tablename__ = 'calendars'
     id: Mapped[int] = mapped_column(primary_key=True)
-    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'))
+    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'), index=True)
     name: Mapped[str] = mapped_column(String(255))
     color: Mapped[str] = mapped_column(String(20), default='#6ee7ff')
     created_by: Mapped[int] = mapped_column(ForeignKey('users.id'))
@@ -55,7 +70,7 @@ class Calendar(Base):
 class Event(Base):
     __tablename__ = 'events'
     id: Mapped[int] = mapped_column(primary_key=True)
-    calendar_id: Mapped[int] = mapped_column(ForeignKey('calendars.id'))
+    calendar_id: Mapped[int] = mapped_column(ForeignKey('calendars.id'), index=True)
     title: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     location: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -70,7 +85,7 @@ class Event(Base):
 class Chore(Base):
     __tablename__ = 'chores'
     id: Mapped[int] = mapped_column(primary_key=True)
-    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'))
+    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'), index=True)
     title: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     points: Mapped[int] = mapped_column(Integer, default=0)
@@ -81,8 +96,8 @@ class Chore(Base):
 class ChoreAssignment(Base):
     __tablename__ = 'chore_assignments'
     id: Mapped[int] = mapped_column(primary_key=True)
-    chore_id: Mapped[int] = mapped_column(ForeignKey('chores.id'))
-    assignee_member_id: Mapped[int] = mapped_column(ForeignKey('family_members.id'))
+    chore_id: Mapped[int] = mapped_column(ForeignKey('chores.id'), index=True)
+    assignee_member_id: Mapped[int] = mapped_column(ForeignKey('family_members.id'), index=True)
     due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default='pending')
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -92,7 +107,7 @@ class ChoreAssignment(Base):
 class ShoppingList(Base):
     __tablename__ = 'shopping_lists'
     id: Mapped[int] = mapped_column(primary_key=True)
-    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'))
+    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'), index=True)
     name: Mapped[str] = mapped_column(String(255))
     created_by: Mapped[int] = mapped_column(ForeignKey('users.id'))
 
@@ -100,7 +115,7 @@ class ShoppingList(Base):
 class ShoppingItem(Base):
     __tablename__ = 'shopping_items'
     id: Mapped[int] = mapped_column(primary_key=True)
-    list_id: Mapped[int] = mapped_column(ForeignKey('shopping_lists.id'))
+    list_id: Mapped[int] = mapped_column(ForeignKey('shopping_lists.id'), index=True)
     text: Mapped[str] = mapped_column(String(255))
     qty: Mapped[str | None] = mapped_column(String(50), nullable=True)
     unit: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -113,18 +128,18 @@ class ShoppingItem(Base):
 class ExpenseAccount(Base):
     __tablename__ = 'expense_accounts'
     id: Mapped[int] = mapped_column(primary_key=True)
-    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'))
+    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'), index=True)
     name: Mapped[str] = mapped_column(String(255))
-    currency: Mapped[str] = mapped_column(String(5), default='USD')
+    currency: Mapped[str] = mapped_column(String(3), default='USD')
     created_by: Mapped[int] = mapped_column(ForeignKey('users.id'))
 
 
 class Expense(Base):
     __tablename__ = 'expenses'
     id: Mapped[int] = mapped_column(primary_key=True)
-    account_id: Mapped[int] = mapped_column(ForeignKey('expense_accounts.id'))
+    account_id: Mapped[int] = mapped_column(ForeignKey('expense_accounts.id'), index=True)
     amount_cents: Mapped[int] = mapped_column(Integer)
-    currency: Mapped[str] = mapped_column(String(5), default='USD')
+    currency: Mapped[str] = mapped_column(String(3), default='USD')
     category: Mapped[str] = mapped_column(String(100), default='general')
     merchant: Mapped[str | None] = mapped_column(String(255), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -135,16 +150,16 @@ class Expense(Base):
 class Split(Base):
     __tablename__ = 'splits'
     id: Mapped[int] = mapped_column(primary_key=True)
-    expense_id: Mapped[int] = mapped_column(ForeignKey('expenses.id'))
-    member_id: Mapped[int] = mapped_column(ForeignKey('family_members.id'))
+    expense_id: Mapped[int] = mapped_column(ForeignKey('expenses.id'), index=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey('family_members.id'), index=True)
     share_cents: Mapped[int] = mapped_column(Integer)
 
 
 class Profile(Base):
     __tablename__ = 'profiles'
     id: Mapped[int] = mapped_column(primary_key=True)
-    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'))
-    member_id: Mapped[int] = mapped_column(ForeignKey('family_members.id'))
+    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'), index=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey('family_members.id'), index=True)
     dob: Mapped[Date | None] = mapped_column(Date, nullable=True)
     blood_type: Mapped[str | None] = mapped_column(String(10), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -154,7 +169,7 @@ class Profile(Base):
 class Medication(Base):
     __tablename__ = 'medications'
     id: Mapped[int] = mapped_column(primary_key=True)
-    profile_id: Mapped[int] = mapped_column(ForeignKey('profiles.id'))
+    profile_id: Mapped[int] = mapped_column(ForeignKey('profiles.id'), index=True)
     name: Mapped[str] = mapped_column(String(255))
     dose: Mapped[str | None] = mapped_column(String(255), nullable=True)
     schedule: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -164,7 +179,7 @@ class Medication(Base):
 class Allergy(Base):
     __tablename__ = 'allergies'
     id: Mapped[int] = mapped_column(primary_key=True)
-    profile_id: Mapped[int] = mapped_column(ForeignKey('profiles.id'))
+    profile_id: Mapped[int] = mapped_column(ForeignKey('profiles.id'), index=True)
     allergen: Mapped[str] = mapped_column(String(255))
     reaction: Mapped[str | None] = mapped_column(String(255), nullable=True)
     severity: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -173,7 +188,7 @@ class Allergy(Base):
 class Immunization(Base):
     __tablename__ = 'immunizations'
     id: Mapped[int] = mapped_column(primary_key=True)
-    profile_id: Mapped[int] = mapped_column(ForeignKey('profiles.id'))
+    profile_id: Mapped[int] = mapped_column(ForeignKey('profiles.id'), index=True)
     name: Mapped[str] = mapped_column(String(255))
     date_administered: Mapped[Date | None] = mapped_column(Date, nullable=True)
 
@@ -181,12 +196,12 @@ class Immunization(Base):
 class MedicalFile(Base):
     __tablename__ = 'medical_files'
     id: Mapped[int] = mapped_column(primary_key=True)
-    profile_id: Mapped[int] = mapped_column(ForeignKey('profiles.id'))
+    profile_id: Mapped[int] = mapped_column(ForeignKey('profiles.id'), index=True)
     filename: Mapped[str] = mapped_column(String(255))
     mime: Mapped[str] = mapped_column(String(255))
     size: Mapped[int] = mapped_column(Integer)
     sha256: Mapped[str] = mapped_column(String(64))
-    stored_path: Mapped[str] = mapped_column(String(255))
+    stored_path: Mapped[str] = mapped_column(String(500))
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[int] = mapped_column(ForeignKey('users.id'))
 
@@ -194,7 +209,7 @@ class MedicalFile(Base):
 class VaultFolder(Base):
     __tablename__ = 'vault_folders'
     id: Mapped[int] = mapped_column(primary_key=True)
-    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'))
+    family_id: Mapped[int] = mapped_column(ForeignKey('families.id'), index=True)
     name: Mapped[str] = mapped_column(String(255))
     created_by: Mapped[int] = mapped_column(ForeignKey('users.id'))
 
@@ -202,10 +217,10 @@ class VaultFolder(Base):
 class VaultItem(Base):
     __tablename__ = 'vault_items'
     id: Mapped[int] = mapped_column(primary_key=True)
-    folder_id: Mapped[int] = mapped_column(ForeignKey('vault_folders.id'))
+    folder_id: Mapped[int] = mapped_column(ForeignKey('vault_folders.id'), index=True)
     title: Mapped[str] = mapped_column(String(255))
     username: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     encrypted_payload: Mapped[str] = mapped_column(Text)
     created_by: Mapped[int] = mapped_column(ForeignKey('users.id'))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -213,17 +228,18 @@ class VaultItem(Base):
 
 class VaultAccess(Base):
     __tablename__ = 'vault_access'
+    __table_args__ = (UniqueConstraint('vault_item_id', 'member_id', name='uq_vault_access_member'),)
     id: Mapped[int] = mapped_column(primary_key=True)
-    vault_item_id: Mapped[int] = mapped_column(ForeignKey('vault_items.id'))
-    member_id: Mapped[int] = mapped_column(ForeignKey('family_members.id'))
+    vault_item_id: Mapped[int] = mapped_column(ForeignKey('vault_items.id'), index=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey('family_members.id'), index=True)
     permission: Mapped[str] = mapped_column(String(20), default='read')
 
 
 class AuditLog(Base):
     __tablename__ = 'audit_log'
     id: Mapped[int] = mapped_column(primary_key=True)
-    family_id: Mapped[int | None] = mapped_column(ForeignKey('families.id'), nullable=True)
-    actor_user_id: Mapped[int | None] = mapped_column(ForeignKey('users.id'), nullable=True)
+    family_id: Mapped[int | None] = mapped_column(ForeignKey('families.id'), nullable=True, index=True)
+    actor_user_id: Mapped[int | None] = mapped_column(ForeignKey('users.id'), nullable=True, index=True)
     action: Mapped[str] = mapped_column(String(100))
     target_type: Mapped[str] = mapped_column(String(100))
     target_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
