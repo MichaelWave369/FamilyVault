@@ -7,19 +7,19 @@ from familyvault.routes import auth, calendar, chores, expenses, families, medic
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title='FamilyVault')
+app = FastAPI(title='FamilyVault', version='0.2.0')
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in settings.cors_origins.split(',')],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
 )
 
-for r in [auth.router, families.router, calendar.router, chores.router, shopping.router, expenses.router, medical.router, vault.router]:
-    app.include_router(r)
+for route_module in [auth, families, calendar, chores, shopping, expenses, medical, vault]:
+    app.include_router(route_module.router)
 
 
 @app.get('/api/healthz')
 def healthz():
-    return {'status': 'ok'}
+    return {'status': 'ok', 'version': '0.2.0'}
