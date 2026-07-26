@@ -14,10 +14,37 @@ from familyvault.schemas import AssignmentIn, ChoreIn
 router = APIRouter(tags=['chores'])
 
 
+def _assignment_summary(db: Session, assignment: ChoreAssignment) -> dict:
+    chore = get_or_404(db, Chore, assignment.chore_id)
+    assignee = get_or_404(db, FamilyMember, assignment.assignee_member_id, 'Assignee not found')
+    return {
+        'id': assignment.id,
+        'chore_id': assignment.chore_id,
+        'chore_title': chore.title,
+        'assignee_member_id': assignment.assignee_member_id,
+        'assignee_name': assignee.display_name,
+        'due_at': assignment.due_at,
+        'status': assignment.status,
+        'completed_at': assignment.completed_at,
+    }
+
+
 @router.get('/api/families/{family_id}/chores')
 def list_chores(family_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     require_role(db, family_id, user.id, 'child')
     return db.scalars(select(Chore).where(Chore.family_id == family_id)).all()
+
+
+@router.get('/api/families/{family_id}/assignments')
+def list_assignments(family_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    require_role(db, family_id, user.id, 'child')
+    chore_ids = select(Chore.id).where(Chore.family_id == family_id)
+    rows = db.scalars(
+        select(ChoreAssignment)
+        .where(ChoreAssignment.chore_id.in_(chore_ids))
+        .order_by(ChoreAssignment.status.asc(), ChoreAssignment.due_at.asc())
+    ).all()
+    return [_assignment_summary(db, assignment) for assignment in rows]
 
 
 @router.post('/api/families/{family_id}/chores')
@@ -45,7 +72,7 @@ def assign(chore_id: int, payload: AssignmentIn, user: User = Depends(get_curren
     db.add(assignment)
     db.commit()
     db.refresh(assignment)
-    return assignment
+    return _assignment_summary(db, assignment)
 
 
 @router.post('/api/assignments/{assignment_id}/complete')
