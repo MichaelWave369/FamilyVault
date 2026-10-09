@@ -1,0 +1,58 @@
+name: FamilyVault GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'showcase/**'
+      - '.github/workflows/familyvault-pages.yml'
+  pull_request:
+    paths:
+      - 'showcase/**'
+      - '.github/workflows/familyvault-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: familyvault-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        working-directory: showcase
+        run: npm install --no-audit --no-fund
+      - name: Build static React preview
+        working-directory: showcase
+        run: npm run build
+      - name: Confirm deployment assets
+        run: |
+          test -f showcase/dist/index.html
+          test -f showcase/dist/icon.svg
+      - name: Upload build for deploy
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: showcase/dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
